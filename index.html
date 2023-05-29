@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Add a polygon to a map using a GeoJSON source</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic3dlcnQiLCJhIjoiY2s3bHNtdjF2MDJ1eTNmcGowanU5MHR4ZiJ9.hzhWj9bhgD5itpWAPc3nNA';
+        const map = new mapboxgl.Map({
+            container: 'map', // container ID
+            // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+            style: 'mapbox://styles/mapbox/light-v11', // style URL
+            center: { lng: 26.19763516246647, lat: 48.155708682928235 },
+            zoom: 8, // starting zoom
+            projection: "mercator"
+        });
+
+        map.on('load', () => {
+            // Add a data source containing GeoJSON data.
+            map.addSource('maine', {
+                'type': 'geojson',
+                'data': {
+                    'type': 'Feature',
+                    'geometry': {
+                        'type': 'Polygon',
+                        // These coordinates outline Maine.
+                        'coordinates': []
+                    }
+                }
+            });
+
+            // Add a new layer to visualize the polygon.
+            map.addLayer({
+                'id': 'maine',
+                'type': 'fill',
+                'source': 'maine', // reference the data source
+                'layout': {},
+                'paint': {
+                    'fill-color': '#0080ff', // blue color fill
+                    'fill-opacity': 0.5
+                }
+            });
+            // Add a black outline around the polygon.
+            map.addLayer({
+                'id': 'outline',
+                'type': 'line',
+                'source': 'maine',
+                'layout': {},
+                'paint': {
+                    'line-color': '#000',
+                    'line-width': 3
+                }
+            });
+
+            map.on("moveend", () => {
+                console.log('moveEnd');
+                const zoom = map.getZoom()
+                if (zoom >= 12) {
+
+                    const bbox = map.getBounds().toArray().flat()
+                    const requestOptions = {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            bbox,
+                        })
+                    };
+                    fetch("http://172.245.6.196:3002", requestOptions)
+                        .then(data => data.json())
+                        .then(data => {
+                            console.log('data', data);
+
+                            const collection = data.map(el => {
+                                return {
+                                    "type": "Feature",
+                                    "properties": {
+                                        fio: el.fio,
+                                    },
+                                    "geometry": JSON.parse(el.geometry)
+                                }
+                            });
+
+                            const featureCollection = {
+                                "type": "FeatureCollection",
+                                "features": collection
+                            }
+
+                            map.getSource("maine").setData(featureCollection)
+                        })
+                        .catch((error) => {
+                            console.error(error);
+                        });
+                }
+            })
+
+
+        });
+    </script>
+
+</body>
+
+</html>
